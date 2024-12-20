@@ -61,7 +61,7 @@ Run the tool with default settings:
 
 ```
 pipenv shell
-python sikw00f.py
+python detect.py
 ```
 
 The tool will:
