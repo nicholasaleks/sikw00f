@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+matplotlib = "*"
+scipy = "*"
+pyhackrf = "*"
+gcpds = "*"
+h5py = "*"
+pyhackrf2 = "*"
+libusb = "*"
+scikit-learn = "*"
+numpy = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"
