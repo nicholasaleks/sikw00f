@@ -1,6 +1,6 @@
 <h1 align="center">
     SiKW00F
-    <a href="https://github.com/nicholasaleks/sikw00f"><img src="https://github.com/nicholasaleks/Damn-Vulnerable-Drone/blob/master/SiKW00F.png?raw=true" alt="sikw00f"/></a>
+    <a href="https://github.com/nicholasaleks/sikw00f"><img src="https://github.com/nicholasaleks/sikw00f/blob/main/SiKW00F.png?raw=true" alt="sikw00f"/></a>
 </h1>
 <p align="center">
   <b>The SiK Radio Detection & Fingerprinting Toolkit.</b>
@@ -33,7 +33,7 @@ SiKW00F applies a range of modular detection heuristics:
 
 Confidence scores from all heuristics are combined into an overall detection confidence. Real-time alerts are provided when SiK radios are detected. Below is also an example screenshot of the simple visual waterfall detecting SiK radio activity.
 
-<img src="https://github.com/nicholasaleks/Damn-Vulnerable-Drone/blob/master/screenshot.png?raw=true" alt="sikw00f-rf-waterfall"/></a>
+<img src="https://github.com/nicholasaleks/sikw00f/blob/main/screenshot.png?raw=true" alt="sikw00f-rf-waterfall"/></a>
 
 ## (Coming Soon) Protocol & Device Fingerprinting 
 
