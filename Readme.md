@@ -1,6 +1,6 @@
 <h1 align="center">
     SiKW00F
-    <a href="https://github.com/nicholasaleks/sikw00f"><img src="https://github.com/nicholasaleks/sikw00f/blob/main/SiKW00F.png?raw=true" alt="sikw00f"/></a>
+    <a href="https://github.com/nicholasaleks/sikw00f"><img src="https://github.com/nicholasaleks/sikw00f/blob/master/SiKW00F.png?raw=true" alt="sikw00f"/></a>
 </h1>
 <p align="center">
   <b>The Drone SiK Radio Detection & MAVLink Telemetry Eavesdropping Toolkit.</b>
