@@ -17,16 +17,15 @@ def dump_params(device: str, baud: int, net_id: str, output_file: str):
       4. Setting S3=<net_id>, then AT&W, ATZ to store & reboot
       5. Closing & re-opening the port
       6. Re-entering AT mode
-      7. Brute-forcing RTI5 with far more attempts, minimal sleeps,
-         so we rapidly spam RTI5 and hopefully catch the TDM window.
-      8. Writing param lines to output_file and logging them
+      7. Brute-forcing RTI5 multiple times until S3= is seen (or max attempts)
+      8. Writing param lines to output_file and logging them to console
       9. Exiting AT mode, closing port
     """
     logger.info(f"[AUTOTUNE] Dumping params for net_id={net_id} to {output_file}...")
 
     # 1) Open serial port
     try:
-        ser = serial.Serial(device, baud, timeout=0.05)
+        ser = serial.Serial(device, baud, timeout=1)
     except SerialException as exc:
         logger.error(f"[AUTOTUNE] Could not open serial port {device}: {exc}")
         return
@@ -52,7 +51,7 @@ def dump_params(device: str, baud: int, net_id: str, output_file: str):
         time.sleep(1)
         _log_serial_response(ser, "[AUTOTUNE] Response after ATS16=0:")
 
-        # 4) Set net ID (S3=<net_id>), then save & reboot
+        # 4) Set net ID (S3=<net_id>), save & reboot
         cmd_s3 = f"ATS3={net_id}\r\n"
         logger.info(f"[AUTOTUNE] Setting S3 => {cmd_s3.strip()}")
         ser.write(cmd_s3.encode("utf-8"))
@@ -88,28 +87,28 @@ def dump_params(device: str, baud: int, net_id: str, output_file: str):
         time.sleep(2)
         _log_serial_response(ser, "[AUTOTUNE] After +++ re-open:")
 
-        # 7) Brute force RTI5 with far more attempts, minimal sleeps
+        # 7) Brute force RTI5 until S3= or we reach max attempts
         param_lines = []
-        max_attempts = 500  # significantly higher
+        max_attempts = 60
         found_s3 = False
 
-        logger.info("[AUTOTUNE] Spamming RTI5 to retrieve current parameters (high attempt count)...")
+        logger.info("[AUTOTUNE] Sending RTI5 command to retrieve current parameters...")
 
         for attempt in range(max_attempts):
+            
             ser.write(b'RTI5\r\n')
-            # minimal sleep so we don't saturate
-            time.sleep(0.05)
-
+            
             lines = _read_all_lines(ser)
+
             if lines:
                 for ln in lines:
                     logger.debug(f"[AUTOTUNE] <RTI5 line> {ln}")
                     param_lines.append(ln)
 
-                # If any line has "S3:NETID" => we found net ID param block => break
+                # If any line has "S3=", assume we found the new net ID param block
                 if any("S3:NETID" in ln.upper() for ln in lines):
                     found_s3 = True
-                    logger.info(f"[AUTOTUNE] Found 'S3:NETID' in RTI5 output after {attempt+1} attempts.")
+                    logger.info("[AUTOTUNE] Found 'S3=' in RTI5 output. Stopping early.")
                     break
             else:
                 logger.debug(f"[AUTOTUNE] No response on RTI5 attempt {attempt+1}")
@@ -131,7 +130,7 @@ def dump_params(device: str, baud: int, net_id: str, output_file: str):
             for line in param_lines:
                 logger.info(f"    {line}")
         else:
-            logger.info("[AUTOTUNE] No parameters retrieved from RTI5 (try again?).")
+            logger.info("[AUTOTUNE] No parameters retrieved from RTI5.")
 
         # 9) Exit AT mode
         ser.write(b'ATO\r\n')
@@ -143,12 +142,25 @@ def dump_params(device: str, baud: int, net_id: str, output_file: str):
         logger.info("[AUTOTUNE] Serial port closed after param dump.")
 
 
+
 def set_params(device: str, baud: int, net_id: str, input_file: str):
     """
-    placeholder for reading param file, applying them to device
+    Read SiK radio parameters from an input file and apply them to your local device
+    to clone the detected drone’s configuration (FHSS pattern, etc.).
+    
+    Placeholder steps might include:
+      1. Read the file line by line for netid, minfreq, maxfreq, channels, etc.
+      2. Enter AT command mode, set those parameters, do AT&W + ATZ, etc.
+      3. Exit AT mode, confirming that the local device now matches the drone's parameters.
+    
+    :param device:       Path to the local SiK radio device (e.g. '/dev/ttyUSB0').
+    :param baud:         Baud rate for the local device (e.g. 57600).
+    :param net_id:       The target drone's net ID (as a string).
+    :param input_file:   Path to input file containing the parameters.
     """
     logger.info(f"[AUTOTUNE] Setting params for net_id={net_id} from {input_file} (placeholder).")
 
+    # TODO: Insert actual logic for reading lines from input_file and sending them to the SiK radio.
     try:
         with open(input_file, "r") as f:
             lines = f.readlines()
@@ -156,6 +168,7 @@ def set_params(device: str, baud: int, net_id: str, input_file: str):
         logger.error(f"[AUTOTUNE] Failed to read parameters from {input_file}: {e}")
         return
 
+    # Example parse (placeholder):
     parsed_params = {}
     for line in lines:
         line = line.strip()
@@ -163,24 +176,46 @@ def set_params(device: str, baud: int, net_id: str, input_file: str):
             key, val = line.split("=", 1)
             parsed_params[key.upper()] = val
 
-    logger.info("[AUTOTUNE] Applying these parameters to device (placeholder):")
+    # Now apply them to your device via AT commands, e.g.:
+    #   ATS3=<netid> etc...
+    # For now, just log them:
+    logger.info("[AUTOTUNE] Applying these parameters to device:")
     for k, v in parsed_params.items():
         logger.info(f"  {k} = {v}")
-    logger.info("[AUTOTUNE] (No actual AT commands yet).")
+    logger.info("[AUTOTUNE] (Placeholder) No actual AT commands sent yet.")
 
 
 def autotune_device(device: str, baud: int, net_id: str, temp_file: str = "autotune_params.txt"):
     """
-    1) Dump param => local file
-    2) set param => local device
+    Perform a full "autotune" of the local SiK radio to match a detected drone's
+    configuration. Typically:
+      1. Dump the drone's current parameters to a file.
+      2. Immediately set the local device params to match them.
+      3. Confirm or log success.
+    
+    :param device:    Path to the local SiK radio (e.g. '/dev/ttyUSB0').
+    :param baud:      Baud rate, e.g. 57600.
+    :param net_id:    The net ID of the drone we want to clone.
+    :param temp_file: Temporary file used to store params for re-importing.
+                      Defaults to "autotune_params.txt".
     """
-    logger.info(f"[AUTOTUNE] Auto-tuning device={device} to clone net_id={net_id}.")
+    logger.info(f"[AUTOTUNE] Auto-tuning device={device} to clone net_id={net_id} (placeholder).")
+
+    # 1) Dump the drone's parameters
     dump_params(device, baud, net_id, temp_file)
+
+    # 2) Set the local device params from that file
     set_params(device, baud, net_id, temp_file)
+
+    # 3) Optionally remove the temp file, confirm success
+    #    For now, we just log a placeholder:
     logger.info("[AUTOTUNE] Completed auto-tune procedure (placeholder).")
 
 
 def _log_serial_response(ser: serial.Serial, prefix: str):
+    """
+    Helper to read lines from the buffer & log them at INFO with a prefix.
+    """
     lines = _read_all_lines(ser)
     if lines:
         logger.info(prefix)
@@ -192,12 +227,14 @@ def _log_serial_response(ser: serial.Serial, prefix: str):
 
 def _read_all_lines(ser: serial.Serial):
     """
-    read lines until none remain
+    Read lines until none remain, return them stripped.
     """
     lines = []
-    while ser.in_waiting > 0:
+    while True:
         line = ser.readline()
         if not line:
             break
-        lines.append(line.decode(errors="replace").strip())
+        line_str = line.decode(errors="replace").strip()
+        if line_str:
+            lines.append(line_str)
     return lines
