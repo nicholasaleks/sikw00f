@@ -140,6 +140,7 @@ SiKW00F is driven by a simple Python CLI, **`sikw00f.py`**, which supports a ran
 
 | Argument                  | Description                                                                                          |
 |---------------------------|------------------------------------------------------------------------------------------------------|
+| **`-h`**    | Displays help details on how to use sikw00f |
 | **`-device <DEVICE>`**    | Specify the SiK radio device path (e.g. `/dev/ttyUSB0`). Overrides the config file if set.          |
 | **`-baud <BAUD>`**        | Baud rate for the device (e.g. `57600`). Overrides the config file if set.                          |
 | **`-config <FILE>`**      | Path to the configuration file (default: `conf/sikw00f.conf`).                                      |
