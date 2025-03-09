@@ -130,15 +130,67 @@ Before running **SiKW00F** and flashing the firmware, ensure your system has the
   - **Windows:**  
     Consider installing [Git Bash](https://gitforwindows.org/) or [Cygwin](https://www.cygwin.com/) for a Unix-like shell environment.
 
+## Usage
 
-## Basic Usage
+SiKW00F is driven by a simple Python CLI, **`sikw00f.py`**, which supports a range of arguments and commands to configure, flash, scan, or eavesdrop on SiK radios. Below is a quick reference for each category of arguments and usage examples.
 
-Run the tool with default settings:
+---
 
-```
-pipenv shell
-python sikw00f.py
-```
+### General Arguments
+
+| Argument                  | Description                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------|
+| **`-device <DEVICE>`**    | Specify the SiK radio device path (e.g. `/dev/ttyUSB0`). Overrides the config file if set.          |
+| **`-baud <BAUD>`**        | Baud rate for the device (e.g. `57600`). Overrides the config file if set.                          |
+| **`-config <FILE>`**      | Path to the configuration file (default: `conf/sikw00f.conf`).                                      |
+| **`-log <LOGFILE>`**      | Log file path (overrides `logging.log_file` in config).                                             |
+| **`-output_dir <DIR>`**   | Output directory (overrides `logging.output_dir` in config).                                        |
+| **`-verbose`**            | Enable verbose (DEBUG) logging for detailed output.                                                 |
+
+### Device Commands
+
+| Argument                  | Description                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------|
+| **`--info`**    | Show info from the SiK radio (version, parameters, etc.). |
+| **`--set-netid <NETID>`**        | Set NetID on the SiK device. |
+| **`--set-minfreq <FREQ>`**      | Set minimum frequency (kHz). |
+| **`--set-maxfreq <FREQ>	`**      | Set maximum frequency (kHz). |
+| **`--set-channel-num <CHANNEL>`**   | Set the channel number (S10). |
+| **`--disable-promiscuous-mode	`**  | Disable the custom firmware’s promiscuous mode. |
+| **`--enable-promiscuous-mode	`**  | Enable the custom firmware’s promiscuous mode. |
+| **`--reset	`**  | Reset the SiK device. (Virtual Power Cycle) |
+
+### Flash Commands
+
+| Argument                  | Description                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------|
+| **`--flash`**    | Flash the SiK device firmware (relies on -device/-baud or config file). |
+| **`--flash check`**        | Check the SiK device firmware (relies on -device/-baud or config file). |
+
+
+### Scanning Commands
+
+| Argument                  | Description                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------|
+| **`--scan`**    | Passively scan for nearby drones (e.g., net IDs, channels). |
+| **`--stop-on-detect`**        | Stop scanning on the first drone detection (no table updates after). |
+| **`---autotune-on-detect`**        | Stop scanning & auto-tune once a drone is detected. |
+
+
+### Autotuning Commands
+
+| Argument                  | Description                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------|
+| **`--dump-params <NET_ID> <FILE>`**    | Dump the discovered drone’s parameters (e.g. S3=NETID, S8=MIN_FREQ, etc.) to an output file. |
+| **`--set-params <NET_ID> <FILE>	`**        | Read parameters from a file and apply them to your local SiK device (placeholder logic). |
+| **`--autotune <NET_ID>`**        | Perform a combined dump & set (auto-tune) to follow the discovered net ID’s FHSS pattern. |
+
+### Eavesdropping Commands
+
+| Argument                  | Description                                                                                          |
+|---------------------------|------------------------------------------------------------------------------------------------------|
+| **`--eavesdrop`**    | Eavesdrop on a drone’s MAVLink telemetry. More packets can be collected if your SiK radio's parameters match the target drone’s parameters (i.e. net ID, min frequency, max frequency and number of channels) |
+
 
 # Example Promiscious Mode
 When a SiK radio is detected:
