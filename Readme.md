@@ -16,6 +16,7 @@ SiK radios are widely used in drone telemetry due to their simplicity and robust
 
 Custom SiK Firmware Modification:
 - NetID Header Control Bypasses
+- Real-Time NetID Overwrite
 - Silent Statistic Frames
 - State Machine Synchronization
 
