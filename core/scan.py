@@ -173,18 +173,14 @@ channel_pattern = re.compile(r"Channel:\s*(\d+)", re.IGNORECASE)
 
 def _handle_line(line: str, drones_dict: dict) -> int | None:
     """
-    Parses a single line for "NetID:<number>" or "Channel:<number>".
+    Parse a single line for "NetID:<number>" or "Channel:<number>".
+    - On a NetID line, create/update the drone record if not present, 
+      setting first_seen = now (if brand-new).
+    - On a Channel line, attach it to the last net ID created, increment packets,
+      update last_seen = now, and return that netid (meaning "updated").
     
-    - When we see a NetID line, we create/update the dictionary entry
-      but do NOT signal detection yet (return None).
-    - When we see a Channel line, we attach it to the *last* net ID in the dict,
-      increment packet count, and THEN return that net ID to indicate detection/update.
-    
-    Returns:
-      The integer net ID if we just processed a Channel line (i.e., an actual packet),
-      or None if we either processed only a NetID line or nothing matched.
+    Returns the integer net ID updated, or None if nothing matched / no new data.
     """
-    # See if this line has "NetID"
     netid_match = netid_pattern.search(line)
     if netid_match:
         netid = int(netid_match.group(1))
@@ -193,52 +189,59 @@ def _handle_line(line: str, drones_dict: dict) -> int | None:
                 "netid": netid,
                 "packets_count": 0,
                 "last_channel": None,
+                "first_seen": datetime.now(),
                 "last_seen": None
             }
-        # We do NOT return netid here => wait until we see a Channel
+        # Return None here means "we only have NetID but not a Channel yet"
         return None
 
-    # See if this line has "Channel"
     chan_match = channel_pattern.search(line)
     if chan_match:
         channel_val = int(chan_match.group(1))
         if not drones_dict:
-            # No net ID known => can't associate this channel
+            # no net ID known => can't associate channel
             return None
-        # Naive approach: attach channel to the last net ID created
+        # We'll do a naive approach: attach channel to the last net ID
         netid = list(drones_dict.keys())[-1]
         drone = drones_dict[netid]
         drone["packets_count"] += 1
         drone["last_channel"] = channel_val
+        # If it's the first time we see a channel for this netid, 
+        # we might also initialize last_seen if it's None.
         drone["last_seen"] = datetime.now()
         return netid
 
-    # If neither pattern was found, do nothing
     return None
-
 
 
 def _display_detected_drones(drones_dict: dict):
     """
-    Clears the console and prints an ASCII table of discovered drones.
-    Each row has: NETID, PACKETS, LAST_CHANNEL, LAST_SEEN
+    Clears the console and prints an ASCII table of discovered drones,
+    now including FIRST_SEEN and LAST_SEEN.
     """
-    os.system("clear")  # or "cls" on Windows
+    os.system("clear")  # or 'cls' on Windows
     print("Detected Drones")
-    print("=" * 50)
-    print(f"{'NETID':<8} {'PACKETS':<8} {'LAST_CH':<8} {'LAST_SEEN'}")
-    print("-" * 50)
+    print("=" * 75)
+    print(f"{'NETID':<8} {'PACKETS':<8} {'LAST_CH':<8} {'FIRST_SEEN':<19} {'LAST_SEEN'}")
+    print("-" * 75)
 
     for netid, info in drones_dict.items():
         netid_str = str(info["netid"])
         pcount_str = str(info["packets_count"])
         chan_str = str(info["last_channel"]) if info["last_channel"] is not None else "-"
-        if info["last_seen"]:
-            seen_str = info["last_seen"].strftime("%Y-%m-%d %H:%M:%S")
+        # first_seen
+        if info.get("first_seen"):
+            first_seen_str = info["first_seen"].strftime("%Y-%m-%d %H:%M:%S")
         else:
-            seen_str = "-"
-        print(f"{netid_str:<8} {pcount_str:<8} {chan_str:<8} {seen_str}")
-    print("=" * 50)
+            first_seen_str = "-"
+        # last_seen
+        if info.get("last_seen"):
+            last_seen_str = info["last_seen"].strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            last_seen_str = "-"
+
+        print(f"{netid_str:<8} {pcount_str:<8} {chan_str:<8} {first_seen_str:<19} {last_seen_str}")
+    print("=" * 75)
 
 
 def _read_all(ser: serial.Serial, chunk_size=1024) -> str:

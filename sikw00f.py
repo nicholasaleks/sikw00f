@@ -23,11 +23,19 @@ from core.device import (
     set_minfreq,
     set_maxfreq,
     set_channels,
+    disable_promiscuous_mode,
+    enable_promiscuous_mode,
     reset_device
 )
 
 from core.scan import (
     scan_for_drones
+)
+
+from core.autotune import (
+    dump_params,
+    set_params,
+    autotune_device
 )
 
 ################################################################################
@@ -78,6 +86,10 @@ def parse_arguments():
                               help="Set maximum frequency (kHz) on the SiK device.")
     device_group.add_argument("--set-channel-num", dest="channel_num", default=None,
                               help="Set channel number on the SiK device.")
+    device_group.add_argument("--disable-promiscuous-mode", action="store_true",
+                          help="Disables promiscuous mode on SiK device.")
+    device_group.add_argument("--enable-promiscuous-mode", action="store_true",
+                          help="Enables promiscuous mode on SiK device.")
     device_group.add_argument("--reset", action="store_true",
                               help="Reset the SiK device.")
 
@@ -225,6 +237,16 @@ def main():
         logger.info(f"Setting channel number to {args.channel_num}")
         set_channels(device, baud, args.channel_num)
 
+    if args.disable_promiscuous_mode:
+        logger.info("Disabling promiscuous mode...")
+        disable_promiscuous_mode(device, baud)
+        sys.exit(0)
+
+    if args.enable_promiscuous_mode:
+        logger.info("Enabling promiscuous mode...")
+        enable_promiscuous_mode(device, baud)
+        sys.exit(0)
+
     if args.reset:
         logger.info("Resetting the SiK device.")
         reset_device(device, baud)
@@ -259,13 +281,19 @@ def main():
     if args.dump_params is not None:
         net_id, output_file = args.dump_params
         logger.info(f"Dumping params for net_id={net_id} to file={output_file}")
+        dump_params(device, baud, net_id, output_file)
+        sys.exit(0)
 
     if args.set_params is not None:
         net_id, input_file = args.set_params
         logger.info(f"Setting params for net_id={net_id} from file={input_file}")
+        set_params(device, baud, net_id, input_file)
+        sys.exit(0)
 
     if args.autotune_netid is not None:
         logger.info(f"Auto-tuning device for net_id={args.autotune_netid}")
+        autotune_device(device, baud, args.autotune_netid)
+        sys.exit(0)
 
     # -- EAVESDROPPING COMMAND --
     if args.eavesdrop:
@@ -279,6 +307,8 @@ def main():
         args.maxfreq,
         args.channel_num,
         args.flash,
+        args.disable_promiscuous_mode,
+        args.enable_promiscuous_mode,
         args.reset,
         args.scan,
         args.stop_on_detect,

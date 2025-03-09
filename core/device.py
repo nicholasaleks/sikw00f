@@ -659,6 +659,156 @@ def set_channels(device: str, baud: int, channel_num: str):
         ser.close()
 
 
+def enable_promiscuous_mode(device: str, baud: int):
+    """
+    Enables promiscous mode on the SiK device by:
+      1. Opening the serial port
+      2. Exiting any prior AT mode
+      3. Sending "+++" to enter AT mode
+      4. Sending "ATS16=1"
+      5. Sending "AT&W" to save changes to EEPROM
+      6. Sending "ATZ" to reboot the device
+      7. Sending "ATO" to return to normal operation
+      8. Closing the port
+    
+    :param device: The serial device path (e.g. '/dev/ttyUSB0').
+    :param baud:   The baud rate (e.g. 57600).
+    """
+    logger.info(f"Enables promiscuous mode on '{device}' at baud={baud}...")
+
+    try:
+        ser = serial.Serial(device, baud, timeout=1)
+    except SerialException as exc:
+        logger.error(f"Could not open serial port {device}: {exc}")
+        return
+
+    try:
+        time.sleep(1)
+        ser.reset_output_buffer()
+        ser.reset_input_buffer()
+
+        # Ensure we're out of any existing AT mode
+        ser.write(b'\r\n')
+        time.sleep(0.5)
+        ser.write(b'ATO\r\n')
+        time.sleep(1)
+
+        # Enter AT command mode
+        ser.write(b'+++')
+        time.sleep(2)
+
+        # 1) Set Promiscous Mode => ATS16=1
+        command = f"ATS16=1\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(1)
+        response_param = _read_all(ser)
+        logger.info(f"Response:\n{response_param.strip()}")
+
+        # 2) Save to EEPROM => AT&W
+        command = "AT&W\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(1)
+        response_save = _read_all(ser)
+        logger.info(f"Response:\n{response_save.strip()}")
+
+        # 3) Reboot => ATZ
+        command = "ATZ\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(2)
+        response_reboot = _read_all(ser)
+        logger.info(f"Response:\n{response_reboot.strip()}")
+
+        # 4) Exit AT command mode => ATO
+        command = "ATO\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(1)
+        response_ato = _read_all(ser)
+        logger.info(f"Response:\n{response_ato.strip()}")
+
+        logger.info("Promiscious mode enabled.")
+    finally:
+        ser.close()
+
+
+def disable_promiscuous_mode(device: str, baud: int):
+    """
+    Disables promiscous mode on the SiK device by:
+      1. Opening the serial port
+      2. Exiting any prior AT mode
+      3. Sending "+++" to enter AT mode
+      4. Sending "ATS16=0"
+      5. Sending "AT&W" to save changes to EEPROM
+      6. Sending "ATZ" to reboot the device
+      7. Sending "ATO" to return to normal operation
+      8. Closing the port
+    
+    :param device: The serial device path (e.g. '/dev/ttyUSB0').
+    :param baud:   The baud rate (e.g. 57600).
+    """
+    logger.info(f"Disabling promiscuous mode on '{device}' at baud={baud}...")
+
+    try:
+        ser = serial.Serial(device, baud, timeout=1)
+    except SerialException as exc:
+        logger.error(f"Could not open serial port {device}: {exc}")
+        return
+
+    try:
+        time.sleep(1)
+        ser.reset_output_buffer()
+        ser.reset_input_buffer()
+
+        # Ensure we're out of any existing AT mode
+        ser.write(b'\r\n')
+        time.sleep(0.5)
+        ser.write(b'ATO\r\n')
+        time.sleep(1)
+
+        # Enter AT command mode
+        ser.write(b'+++')
+        time.sleep(2)
+
+        # 1) Set Promiscous Mode => ATS16=0
+        command = f"ATS16=0\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(1)
+        response_param = _read_all(ser)
+        logger.info(f"Response:\n{response_param.strip()}")
+
+        # 2) Save to EEPROM => AT&W
+        command = "AT&W\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(1)
+        response_save = _read_all(ser)
+        logger.info(f"Response:\n{response_save.strip()}")
+
+        # 3) Reboot => ATZ
+        command = "ATZ\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(2)
+        response_reboot = _read_all(ser)
+        logger.info(f"Response:\n{response_reboot.strip()}")
+
+        # 4) Exit AT command mode => ATO
+        command = "ATO\r\n"
+        logger.info(f"Sending command: {command.strip()}")
+        ser.write(command.encode("utf-8"))
+        time.sleep(1)
+        response_ato = _read_all(ser)
+        logger.info(f"Response:\n{response_ato.strip()}")
+
+        logger.info("Promiscious mode disabled.")
+    finally:
+        ser.close()
+
+
 def reset_device(device: str, baud: int):
     """
     Resets the SiK device using 'ATZ'. Specifically:
