@@ -94,7 +94,7 @@ def scan_for_drones(
 
     try:
         _enable_scanning_mode(ser)
-        logger.info("Looping: spam RTI5, parse lines. No reboots or leaving AT mode.")
+        logger.info("Scanning for nearby drones in promiscuous mode...")
         while True:
             # (a) check time-based stop
             if scan_timeout > 0:
