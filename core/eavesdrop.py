@@ -2,16 +2,17 @@
 # core/eavesdrop.py
 
 """
-Eavesdrop on MAVLink telemetry with an expanded top table of additional fields:
- - A "Status Line" showing: Armed state, FlightMode, Satellite count, BatteryVolts, Battery%,
-   plus the usual rows for HEARTBEAT, ATTITUDE, VFR_HUD, etc.
- - A bottom window showing raw MAVLink lines (tail).
- - Logging to sikw00f.log only (no console spam).
-
+SiKW00F Drone Telemetry Eavesdrop (Expanded Fields):
+  1) Disables ATS16=1 if it's set, saves & reboots the radio.
+  2) Connects to the radio for normal MAVLink comms.
+  3) Displays an expanded curses TUI with:
+     - 'Status Line' (Armed, FlightMode, Sats, BatteryVolts, Battery%, system time)
+     - Standard lines for HEARTBEAT, ATTITUDE, VFR_HUD, etc.
+  4) Logs all raw MAVLink lines to sikw00f.log (no console spam)
+  5) Press 'q' or Ctrl+C to exit.
+  
 Usage:
   python eavesdrop.py /dev/ttyUSB0 57600
-
-Press 'q' or Ctrl+C to exit.
 """
 
 import sys
@@ -20,12 +21,16 @@ import curses
 import logging
 from pymavlink import mavutil
 
+# For reading/writing to the serial port in the disable_promiscuous_mode function
+from serial import Serial, SerialException
+
 ########################################
 # Setup file-only logging
 ########################################
 logger = logging.getLogger("EAVESDROP_LOGGER")
 logger.setLevel(logging.INFO)
 
+# Remove any existing handlers (including console)
 for h in logger.handlers[:]:
     logger.removeHandler(h)
 
@@ -34,7 +39,9 @@ file_fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 file_handler.setFormatter(file_fmt)
 logger.addHandler(file_handler)
 
+########################################
 # Optional flight-mode lookup for ArduPilot
+########################################
 ARDUPILOT_MODES = {
     0 :  "STABILIZE",
     1 :  "ACRO",
@@ -50,18 +57,90 @@ ARDUPILOT_MODES = {
     11: "FLIP",
     13: "POSHOLD",
     14: "BRAKE",
-    # etc...
+    # etc... add more as needed
 }
 
+def _read_all(ser, chunk_size=1024):
+    """ Helper to read leftover lines from a pyserial port. """
+    output = []
+    while True:
+        chunk = ser.read(chunk_size)
+        if not chunk:
+            break
+        output.append(chunk.decode(errors='replace'))
+    return "".join(output)
+
+def disable_promiscuous_mode(device: str, baud: int) -> bool:
+    """
+    Ensure ATS16=0, save & reboot so the radio is NOT in promiscuous mode.
+    Then close the port. Return True if success, False if fail.
+    """
+    logger.info(f"[DISABLE_PMODE] Opening {device} @ {baud} to set ATS16=0.")
+    try:
+        ser = Serial(device, baud, timeout=1)
+    except SerialException as exc:
+        logger.error(f"Could not open serial port {device}: {exc}")
+        return False
+
+    try:
+        time.sleep(1)
+        ser.reset_output_buffer()
+        ser.reset_input_buffer()
+
+        # Exit any leftover AT mode
+        ser.write(b'\r\n')
+        time.sleep(0.5)
+        ser.write(b'ATO\r\n')
+        time.sleep(1)
+
+        # Enter AT command mode
+        ser.write(b'+++')
+        time.sleep(2)
+
+        # 1) ATS16=0
+        logger.info("[DISABLE_PMODE] Setting ATS16=0")
+        ser.write(b'ATS16=0\r\n')
+        time.sleep(1)
+        resp = _read_all(ser)
+        logger.info(f"ATS16=0 response:\n{resp.strip()}")
+
+        # 2) AT&W
+        logger.info("[DISABLE_PMODE] Saving with AT&W")
+        ser.write(b'AT&W\r\n')
+        time.sleep(1)
+        resp = _read_all(ser)
+        logger.info(f"AT&W response:\n{resp.strip()}")
+
+        # 3) ATZ to reboot
+        logger.info("[DISABLE_PMODE] Rebooting with ATZ")
+        ser.write(b'ATZ\r\n')
+        time.sleep(1)
+        resp = _read_all(ser)
+        logger.info(f"ATZ response:\n{resp.strip()}")
+
+        # 4) ATO
+        ser.write(b'ATO\r\n')
+        time.sleep(1)
+
+        logger.info("[DISABLE_PMODE] Radio reset done, closing port.")
+        return True
+    finally:
+        ser.close()
+        # Wait a few seconds for device to fully reboot
+        time.sleep(3)
 
 def eavesdrop_mavlink(device: str, baud: int):
     """
-    Create a MAVLink connection, run a curses-based UI:
-      - top table of key fields (expanded columns),
-      - bottom tail of raw logs,
-      - logs everything to sikw00f.log, no console spam.
+    1) disable ATS16=1 by calling disable_promiscuous_mode
+    2) Connect normally via mavutil
+    3) Launch curses TUI
     """
-    logger.info(f"[EAVSDROP] Connecting to {device} at {baud} baud.")
+    ok = disable_promiscuous_mode(device, baud)
+    if not ok:
+        logger.error("[EAVSDROP] Could not disable ATS16=1. Exiting.")
+        return
+
+    logger.info(f"[EAVSDROP] Connecting to {device} at {baud} after normal reset.")
     master = mavutil.mavlink_connection(
         device=device,
         baud=baud,
@@ -81,16 +160,17 @@ def eavesdrop_mavlink(device: str, baud: int):
     }
 
     log_buffer = []
-
     curses.wrapper(_main_curses_loop, master, eav_data, log_buffer)
 
 
 def _main_curses_loop(stdscr, master, eav_data, log_buffer):
+    """The main curses loop reading MAVLink messages, updating data, and redrawing UI."""
     curses.curs_set(0)
     stdscr.nodelay(True)
     height, width = stdscr.getmaxyx()
 
-    table_height = min(22, height - 1)  # a bit bigger for extra lines
+    # Make the top table ~22 rows, the remainder for log
+    table_height = min(22, height - 1)
     log_height   = height - table_height
 
     table_win = curses.newwin(table_height, width, 0, 0)
@@ -101,31 +181,27 @@ def _main_curses_loop(stdscr, master, eav_data, log_buffer):
 
     try:
         while True:
-            # read a MAVLink message, waiting up to 1s
+            # read MAVLink message, partial-block
             msg = master.recv_match(blocking=True, timeout=1)
             if msg is not None:
-                # Log to file
                 logger.info("MAVLINK: %s", msg)
 
-                # Add to bottom curses log
                 line = f"MAVLINK: {msg}"
                 log_buffer.append(line)
                 if len(log_buffer) > max_log_buffer_size:
                     log_buffer = log_buffer[-(max_log_buffer_size // 2):]
 
-                # If tracked, store for top table
                 msg_type = msg.get_type()
                 if msg_type in eav_data:
                     eav_data[msg_type] = msg.to_dict()
 
-            # Redraw every 0.1s
+            # redraw UI every ~0.1s
             now = time.time()
             if now - last_draw_time > 0.1:
                 _draw_table(table_win, eav_data)
                 _draw_log(log_win, log_buffer)
                 last_draw_time = now
 
-            # check user input
             c = stdscr.getch()
             if c == ord('q'):
                 break
@@ -140,9 +216,9 @@ def _main_curses_loop(stdscr, master, eav_data, log_buffer):
 
 def _draw_table(win, eav_data):
     """
-    Clear the top window, box it, and display expanded columns:
-      - A "Status Line" with Armed state, Flight mode, # sats, battery volts & %, system time
-      - Then the usual lines for HEARTBEAT, ATTITUDE, etc.
+    Clear the top window, box it, and display an expanded set of columns:
+      - Status line: ARMED, FlightMode, Sats, BatteryVolts/%, SystemTime
+      - Then typical lines for HEARTBEAT, ATTITUDE, VFR_HUD, GPS_RAW_INT, RAW_IMU, BATTERY_STATUS
     """
     win.erase()
     win.box()
@@ -165,63 +241,54 @@ def _draw_table(win, eav_data):
     row += 2
 
     ########################################
-    # Additional "Status" columns in one line
+    # 1) "Status Line" columns
     ########################################
-    # 1) Armed? from HEARTBEAT.base_mode bit
-    hb = eav_data["HEARTBEAT"]
+    hb  = eav_data["HEARTBEAT"]
     base_mode = hb.get('base_mode', 0)
+    # Armed?
     armed_str = "YES" if (base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) else "NO"
 
-    # 2) FlightMode from custom_mode if autopilot=3 (ArduPilot)
     autopilot = hb.get('autopilot')
     cmode     = hb.get('custom_mode', None)
     flight_mode = "Unknown"
     if autopilot == 3 and cmode is not None:
         flight_mode = ARDUPILOT_MODES.get(cmode, f"Mode#{cmode}")
 
-    # 3) Sats from GPS_RAW_INT
     gps = eav_data["GPS_RAW_INT"]
-    sats = gps.get('satellites_visible') if gps else None
-    sats_str = str(sats) if sats is not None else "N/A"
+    if gps:
+        sats = gps.get('satellites_visible', 'N/A')
+    else:
+        sats = 'N/A'
 
-    # 4) BatteryVolts & BatteryRemaining from BATTERY_STATUS
     batt = eav_data["BATTERY_STATUS"]
     if batt:
-        # total voltage can come from `voltages` array or a single cell?
-        # E.g. using the first cell or sum up if needed.
         volts_arr = batt.get('voltages', [])
         if volts_arr and volts_arr[0] < 65535:
-            first_volts = float(volts_arr[0]) / 1000.0  # in mV => convert to V
+            first_volts = float(volts_arr[0]) / 1000.0
             batt_volts_str = f"{first_volts:.2f}V"
         else:
             batt_volts_str = "N/A"
-
-        batt_rem = batt.get('battery_remaining')
-        if isinstance(batt_rem, int):
-            batt_rem_str = f"{batt_rem}%"
+        brem = batt.get('battery_remaining')
+        if isinstance(brem, int):
+            batt_rem_str = f"{brem}%"
         else:
             batt_rem_str = "N/A"
     else:
         batt_volts_str = "N/A"
         batt_rem_str   = "N/A"
 
-    # 5) SystemTime from SYSTEM_TIME (time_unix_usec)
     st = eav_data["SYSTEM_TIME"]
     time_unix = st.get('time_unix_usec')
-    if time_unix is not None:
-        system_time_str = str(time_unix)
-    else:
-        system_time_str = "N/A"
+    system_time_str = str(time_unix) if time_unix is not None else "N/A"
 
-    # Combine into a single row
-    status_line = (f"ARMED:{armed_str}  Mode:{flight_mode}  Sats:{sats_str}  "
+    status_line = (f"ARMED:{armed_str}  Mode:{flight_mode}  Sats:{sats}  "
                    f"Batt:{batt_volts_str}/{batt_rem_str}  Time:{system_time_str}")
 
     safe_addstr(row, 2, status_line)
     row += 2
 
     ########################################
-    # Usual lines
+    # 2) The usual fields
     ########################################
     # HEARTBEAT
     safe_addstr(row, 2, "[HEARTBEAT]")
@@ -238,9 +305,9 @@ def _draw_table(win, eav_data):
     safe_addstr(row, 2, "[ATTITUDE]")
     row += 1
     if att:
-        roll_val = att.get('roll')
-        pitch_val=att.get('pitch')
-        yaw_val  =att.get('yaw')
+        roll_val  = att.get('roll')
+        pitch_val = att.get('pitch')
+        yaw_val   = att.get('yaw')
         roll_s  = f"{roll_val:.3f}" if isinstance(roll_val,(int,float)) else "N/A"
         pitch_s = f"{pitch_val:.3f}" if isinstance(pitch_val,(int,float)) else "N/A"
         yaw_s   = f"{yaw_val:.3f}" if isinstance(yaw_val,(int,float)) else "N/A"
@@ -255,14 +322,14 @@ def _draw_table(win, eav_data):
     safe_addstr(row, 2, "[VFR_HUD]")
     row += 1
     if hud:
-        alt_val = hud.get('alt')
-        gs_val  = hud.get('groundspeed')
-        hdg_val = hud.get('heading')
-        thr_val = hud.get('throttle')
-        alt_s = f"{alt_val:.1f}" if isinstance(alt_val,(int,float)) else "N/A"
-        gs_s  = f"{gs_val:.2f}" if isinstance(gs_val,(int,float)) else "N/A"
-        hdg_s = str(hdg_val) if hdg_val is not None else "N/A"
-        thr_s = str(thr_val) if thr_val is not None else "N/A"
+        alt_v = hud.get('alt')
+        gs_v  = hud.get('groundspeed')
+        hdg_v = hud.get('heading')
+        thr_v = hud.get('throttle')
+        alt_s = f"{alt_v:.1f}" if isinstance(alt_v,(int,float)) else "N/A"
+        gs_s  = f"{gs_v:.2f}" if isinstance(gs_v,(int,float)) else "N/A"
+        hdg_s = str(hdg_v) if hdg_v is not None else "N/A"
+        thr_s = str(thr_v) if thr_v is not None else "N/A"
         line_hud = f"Alt:{alt_s}, GSpd:{gs_s}, Head:{hdg_s}, Thr:{thr_s}"
     else:
         line_hud= "No VFR_HUD data."
@@ -273,12 +340,15 @@ def _draw_table(win, eav_data):
     safe_addstr(row, 2, "[GPS_RAW_INT]")
     row += 1
     if gps:
-        fix  = gps.get('fix_type','N/A')
-        lat  = gps.get('lat','N/A')
-        lon  = gps.get('lon','N/A')
-        altg = gps.get('alt','N/A')
-        satv = gps.get('satellites_visible','N/A')
-        line_gps = f"Fix:{fix}, Lat:{lat}, Lon:{lon}, Alt:{altg}, Sats:{satv}"
+        fix    = gps.get('fix_type','N/A')
+        lat_i  = gps.get('lat','N/A')
+        lon_i  = gps.get('lon','N/A')
+        altg   = gps.get('alt','N/A')
+        sats_v = gps.get('satellites_visible','N/A')
+        # If lat_i is an integer from MAVLink (1e7 scaling):
+        # lat_degs = lat_i / 1e7
+        # etc. But we'll just display raw for now.
+        line_gps = f"Fix:{fix}, Lat:{lat_i}, Lon:{lon_i}, Alt:{altg}, Sats:{sats_v}"
     else:
         line_gps = "No GPS data."
     safe_addstr(row, 4, line_gps)
@@ -308,8 +378,11 @@ def _draw_table(win, eav_data):
         br   = batt.get('battery_remaining','N/A')
         cb   = batt.get('current_battery','N/A')
         vls  = batt.get('voltages',[])
-        c1   = (float(vls[0])/1000.0 if vls and vls[0]<65535 else None)
-        c1_s = f"{c1:.2f}V" if isinstance(c1,float) else "N/A"
+        if vls and vls[0] < 65535:
+            c1v  = float(vls[0])/1000.0
+            c1_s = f"{c1v:.2f}V"
+        else:
+            c1_s = "N/A"
         line_batt = f"Remain:{br}%, Curr:{cb}mA, Cell1:{c1_s}"
     else:
         line_batt= "No Battery data."
@@ -318,17 +391,12 @@ def _draw_table(win, eav_data):
 
     win.refresh()
 
-
 def _draw_log(win, log_buffer):
-    """
-    Show the tail of raw MAVLink lines in the bottom window.
-    Truncates lines if too wide.
-    """
+    """Show the tail of raw MAVLink lines in the bottom window, truncated if too wide."""
     win.erase()
     win.box()
     height, width = win.getmaxyx()
     inner_height  = height - 2
-
     portion = log_buffer[-inner_height:]
 
     row = 1
@@ -344,7 +412,6 @@ def _draw_log(win, log_buffer):
         row += 1
 
     win.refresh()
-
 
 def main():
     if len(sys.argv) < 3:
