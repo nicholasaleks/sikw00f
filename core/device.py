@@ -736,25 +736,28 @@ def enable_promiscuous_mode(device: str, baud: int):
 
 def disable_promiscuous_mode(device: str, baud: int):
     """
-    Disables promiscous mode on the SiK device by:
+    Disables promiscuous mode on the SiK device by:
       1. Opening the serial port
       2. Exiting any prior AT mode
-      3. Sending "+++" to enter AT mode
+      3. Entering AT command mode ("+++")
       4. Sending "ATS16=0"
       5. Sending "AT&W" to save changes to EEPROM
       6. Sending "ATZ" to reboot the device
-      7. Sending "ATO" to return to normal operation
-      8. Closing the port
+      7. Closing the port and waiting for the device to reboot
+      8. Re-opening the port
+      9. Re-entering AT mode (optional) to confirm or finalize
+      10. Sending "ATO" to return to normal operation
+      11. Closing the port
     
     :param device: The serial device path (e.g. '/dev/ttyUSB0').
     :param baud:   The baud rate (e.g. 57600).
     """
-    logger.info(f"Disabling promiscuous mode on '{device}' at baud={baud}...")
+    logger.info(f"[DISABLE-PROMISCUOUS] Disabling promiscuous mode on '{device}' at baud={baud}...")
 
     try:
         ser = serial.Serial(device, baud, timeout=1)
     except SerialException as exc:
-        logger.error(f"Could not open serial port {device}: {exc}")
+        logger.error(f"[DISABLE-PROMISCUOUS] Could not open serial port {device}: {exc}")
         return
 
     try:
@@ -772,41 +775,62 @@ def disable_promiscuous_mode(device: str, baud: int):
         ser.write(b'+++')
         time.sleep(2)
 
-        # 1) Set Promiscous Mode => ATS16=0
-        command = f"ATS16=0\r\n"
-        logger.info(f"Sending command: {command.strip()}")
+        # 1) Set Promiscuous Mode => ATS16=0
+        command = "ATS16=0\r\n"
+        logger.info(f"[DISABLE-PROMISCUOUS] Sending command: {command.strip()}")
         ser.write(command.encode("utf-8"))
         time.sleep(1)
         response_param = _read_all(ser)
-        logger.info(f"Response:\n{response_param.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Response:\n{response_param.strip()}")
 
-        # 2) Save to EEPROM => AT&W
+        # 2) Save => AT&W
         command = "AT&W\r\n"
-        logger.info(f"Sending command: {command.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Sending command: {command.strip()}")
         ser.write(command.encode("utf-8"))
         time.sleep(1)
         response_save = _read_all(ser)
-        logger.info(f"Response:\n{response_save.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Response:\n{response_save.strip()}")
 
         # 3) Reboot => ATZ
         command = "ATZ\r\n"
-        logger.info(f"Sending command: {command.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Sending command: {command.strip()}")
         ser.write(command.encode("utf-8"))
-        time.sleep(2)
+        time.sleep(1)
+        # Optionally read immediate response lines here:
         response_reboot = _read_all(ser)
-        logger.info(f"Response:\n{response_reboot.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Response (pre-close):\n{response_reboot.strip()}")
 
-        # 4) Exit AT command mode => ATO
+        # 4) Close port, wait for reboot
+        ser.close()
+        logger.info("[DISABLE-PROMISCUOUS] Closed port after ATZ. Waiting 2s for device to reboot...")
+        time.sleep(2)
+
+        # 5) Re-open port
+        ser = serial.Serial(device, baud, timeout=1)
+        logger.info("[DISABLE-PROMISCUOUS] Re-opened port after reboot.")
+
+        # 6) (Optional) Re-enter AT mode to confirm
+        time.sleep(1)
+        ser.reset_output_buffer()
+        ser.reset_input_buffer()
+        ser.write(b'+++')
+        time.sleep(2)
+        # e.g. read response
+        reenter_resp = _read_all(ser)
+        logger.info(f"[DISABLE-PROMISCUOUS] After +++ re-open:\n{reenter_resp.strip()}")
+
+        # 7) Optionally exit AT mode => ATO
         command = "ATO\r\n"
-        logger.info(f"Sending command: {command.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Sending command: {command.strip()}")
         ser.write(command.encode("utf-8"))
         time.sleep(1)
         response_ato = _read_all(ser)
-        logger.info(f"Response:\n{response_ato.strip()}")
+        logger.info(f"[DISABLE-PROMISCUOUS] Response:\n{response_ato.strip()}")
 
-        logger.info("Promiscious mode disabled.")
+        logger.info("[DISABLE-PROMISCUOUS] Promiscuous mode disabled successfully.")
     finally:
         ser.close()
+        logger.info("[DISABLE-PROMISCUOUS] Serial port closed.")
 
 
 def reset_device(device: str, baud: int):

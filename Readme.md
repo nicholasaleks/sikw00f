@@ -50,7 +50,21 @@ SiKW00F is designed to easily capture and display a wide range of MAVLink teleme
 - STATUSTEXT: Conveys system messages and warnings, offering insights into flight events and potential issues.
 - PARAM_VALUE: Shows current parameter settings, which can help in understanding and tuning the drone’s performance.
 
-# How to Use SiKW00F
+## Installation
+
+### Dependencies
+
+Linux (Ubuntu/Debian)
+```
+sudo apt-get update
+sudo apt-get install git make sdcc build-essential python3.11
+```
+
+MacOS (Ubuntu/Debian)
+```
+brew install git make sdcc python@3.11
+xcode-select --install
+```
 
 ## Installation
 Clone the repository:
@@ -59,76 +73,6 @@ Clone the repository:
 git clone https://github.com/nicholasaleks/sikw00f.git
 cd sikw00f
 ```
-
-## Install Dependencies
-
-Before running **SiKW00F** and flashing the firmware, ensure your system has the following dependencies installed:
-
-- **Git**  
-  Used to clone the firmware repository.  
-  **Installation:**  
-  - **Linux:**  
-    ```bash
-    sudo apt-get install git
-    ```  
-  - **macOS:**  
-    ```bash
-    brew install git
-    ```  
-  - **Windows:**  
-    Download and install [Git for Windows](https://gitforwindows.org/).
-
-- **GNU Make**  
-  Required to build the firmware using the provided Makefile.  
-  **Installation:**  
-  - **Linux:**  
-    ```bash
-    sudo apt-get install make
-    ```  
-  - **macOS:**  
-    ```bash
-    brew install make
-    ```  
-  - **Windows:**  
-    Install via [MinGW](http://www.mingw.org/) or [Cygwin](https://www.cygwin.com/).
-
-- **SDCC (Small Device C Compiler)**  
-  Used to compile the firmware for the radio's microcontroller.  
-  **Installation:**  
-  - **Linux:**  
-    ```bash
-    sudo apt-get install sdcc
-    ```  
-  - **macOS:**  
-    ```bash
-    brew install sdcc
-    ```  
-  - **Windows:**  
-    Download and install from the [SDCC website](http://sdcc.sourceforge.net/).
-
-- **C Compiler and Build Tools**  
-  Required for compiling and linking firmware.  
-  **Installation:**  
-  - **Linux:**  
-    ```bash
-    sudo apt-get install build-essential
-    ```  
-  - **macOS:**  
-    Install the Xcode Command Line Tools:  
-    ```bash
-    xcode-select --install
-    ```
-
-- **Python 3.11**  
-  Required to run the uploader script (`uploader.py`).  
-  **Installation:**  
-  - Download from the [official Python website](https://www.python.org/downloads/) or use your system’s package manager if available.
-
-- **Unix-like Shell**  
-  Required for running build scripts.  
-  - **Linux/macOS:** Usually provided by default.  
-  - **Windows:**  
-    Consider installing [Git Bash](https://gitforwindows.org/) or [Cygwin](https://www.cygwin.com/) for a Unix-like shell environment.
 
 ## Usage
 

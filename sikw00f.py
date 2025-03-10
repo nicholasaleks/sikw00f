@@ -38,6 +38,10 @@ from core.autotune import (
     autotune_device
 )
 
+from core.eavesdrop import (
+    eavesdrop_mavlink
+)
+
 ################################################################################
 # Constants / Defaults
 ################################################################################
@@ -298,6 +302,8 @@ def main():
     # -- EAVESDROPPING COMMAND --
     if args.eavesdrop:
         logger.info("Eavesdropping on MAVLink telemetry.")
+        eavesdrop_mavlink(device, baud)
+        sys.exit(0)
 
     # If no recognized command is specified, show help
     no_commands = not any([
