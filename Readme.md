@@ -134,22 +134,8 @@ SiKW00F is driven by a simple Python CLI, **`sikw00f.py`**, which supports a ran
 
 | Argument                  | Description                                                                                          |
 |---------------------------|------------------------------------------------------------------------------------------------------|
-| **`--eavesdrop`**    | Eavesdrop on a drone’s MAVLink telemetry. More packets can be collected if your SiK radio's parameters match the target drone’s parameters (i.e. net ID, min frequency, max frequency and number of channels) |
+| **`--eavesdrop`**    | Eavesdrop on a drone’s MAVLink telemetry. Note: Be sure to --disable-promiscuous-mode before running eavsdrop and to ensure more packets can be collected if your SiK radio's parameters match the target drone’s parameters (i.e. net ID, min frequency, max frequency and number of channels) |
 
-
-# Example Promiscious Mode
-When a SiK radio is detected:
-
-```
-
-```
-
-# Example Eavesdropping Mode
-When you are eavesdropping on a drone MAVLink connection:
-
-```
-
-```
 
 # Features
 - Promiscuous Scanning Mode: Continuously monitors the radio spectrum to capture NetIDs and detect active SiK telemetry links.
