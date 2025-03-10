@@ -70,64 +70,6 @@ def _read_all(ser, chunk_size=1024):
         output.append(chunk.decode(errors='replace'))
     return "".join(output)
 
-def disable_promiscuous_mode(device: str, baud: int) -> bool:
-    """
-    Ensure ATS16=0, save & reboot so the radio is NOT in promiscuous mode.
-    Then close the port. Return True if success, False if fail.
-    """
-    logger.info(f"[DISABLE_PMODE] Opening {device} @ {baud} to set ATS16=0.")
-    try:
-        ser = Serial(device, baud, timeout=1)
-    except SerialException as exc:
-        logger.error(f"Could not open serial port {device}: {exc}")
-        return False
-
-    try:
-        time.sleep(1)
-        ser.reset_output_buffer()
-        ser.reset_input_buffer()
-
-        # Exit any leftover AT mode
-        ser.write(b'\r\n')
-        time.sleep(0.5)
-        ser.write(b'ATO\r\n')
-        time.sleep(1)
-
-        # Enter AT command mode
-        ser.write(b'+++')
-        time.sleep(2)
-
-        # 1) ATS16=0
-        logger.info("[DISABLE_PMODE] Setting ATS16=0")
-        ser.write(b'ATS16=0\r\n')
-        time.sleep(1)
-        resp = _read_all(ser)
-        logger.info(f"ATS16=0 response:\n{resp.strip()}")
-
-        # 2) AT&W
-        logger.info("[DISABLE_PMODE] Saving with AT&W")
-        ser.write(b'AT&W\r\n')
-        time.sleep(1)
-        resp = _read_all(ser)
-        logger.info(f"AT&W response:\n{resp.strip()}")
-
-        # 3) ATZ to reboot
-        logger.info("[DISABLE_PMODE] Rebooting with ATZ")
-        ser.write(b'ATZ\r\n')
-        time.sleep(1)
-        resp = _read_all(ser)
-        logger.info(f"ATZ response:\n{resp.strip()}")
-
-        # 4) ATO
-        ser.write(b'ATO\r\n')
-        time.sleep(1)
-
-        logger.info("[DISABLE_PMODE] Radio reset done, closing port.")
-        return True
-    finally:
-        ser.close()
-        # Wait a few seconds for device to fully reboot
-        time.sleep(3)
 
 def eavesdrop_mavlink(device: str, baud: int):
     """
@@ -135,10 +77,6 @@ def eavesdrop_mavlink(device: str, baud: int):
     2) Connect normally via mavutil
     3) Launch curses TUI
     """
-    ok = disable_promiscuous_mode(device, baud)
-    if not ok:
-        logger.error("[EAVSDROP] Could not disable ATS16=1. Exiting.")
-        return
 
     logger.info(f"[EAVSDROP] Connecting to {device} at {baud} after normal reset.")
     master = mavutil.mavlink_connection(
