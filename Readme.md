@@ -28,13 +28,9 @@ For more details on the firmware mod, go to: <a href="https://github.com/nichola
 
 A third SiK radio, loaded with custom-modified firmware, is set to a promiscuous mode. It passively listens to all transmissions, capturing packets and extracting NetIDs from all nearby drones and ground control station telemetry communications. This mode identifies active SiK networks and gathers the necessary data (like NetIDs) to later target a specific telemetry link for eavesdropping.
 
-[Picture of Passive Mode]
-
 ## Drone Telemetry Eavesdropping Mode
 
 Using the data collected during promiscuous scanning, SiKW00F actively tunes the attacker SiK radio to follow the frequency hops dictated by the NetID and other parameters. This connection phase integrates active mode features by honing in on the FHSS sequence, thereby enabling detailed eavesdropping on the telemetry exchange between the drone and its GCS.
-
-[Picture of Eavesdropping Mode]
 
 ### Example MAVLink Telemetry Eavesdropping
 
