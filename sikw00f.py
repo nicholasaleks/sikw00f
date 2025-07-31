@@ -29,7 +29,8 @@ from core.device import (
 )
 
 from core.scan import (
-    scan_for_drones
+    scan_for_drones,
+    deep_scan_for_drones
 )
 
 from core.autotune import (
@@ -114,7 +115,9 @@ def parse_arguments():
     # -- SCANNING COMMANDS --
     scan_group = parser.add_argument_group("Scanning Commands")
     scan_group.add_argument("--scan", action="store_true",
-                            help="Scan for nearby drones (passive scanning).")
+                            help="Passive scan for nearby drones (great for general drone detection but does not extract SiK parameters).")
+    scan_group.add_argument("--deep-scan", action="store_true",
+                        help="Actively scan for nearby drones and extract their SiK parameters (more aggressive and noisey).")
     scan_group.add_argument("--stop-on-detect", action="store_true",
                             help="Stop scanning when a drone is detected.")
     scan_group.add_argument("--autotune-on-detect", action="store_true",
@@ -274,7 +277,30 @@ def main():
             device=device,
             baud=baud,
             stop_on_detect=args.stop_on_detect,
-            autotune_on_detect=args.autotune_on_detect,
+            scan_timeout=scan_timeout
+        )
+
+        # Stop the script after scanning, or remove this if you want more commands to run afterward
+        sys.exit(0)
+
+    if args.deep_scan:
+        logger.info("Starting deep scanning for nearby drones.")
+
+        if args.stop_on_detect:
+            logger.debug("Stop-on-detect mode is active.")
+        if args.autotune_on_detect:
+            logger.debug("Autotune-on-detect mode is active.")
+
+        # Optionally read a scan_timeout from config, e.g. under [scanning]:
+        # scan_timeout = 60
+        scan_timeout = config.getint("scanning", "scan_timeout", fallback=0)
+        logger.debug(f"scan_timeout={scan_timeout}")
+
+        # Now invoke the actual scanning logic
+        deep_scan_for_drones(
+            device=device,
+            baud=baud,
+            stop_on_detect=args.stop_on_detect,
             scan_timeout=scan_timeout
         )
 

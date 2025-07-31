@@ -31,6 +31,85 @@ def scan_for_drones(
     scan_timeout: int = 0
 ):
     """
+    Passive scan for drones — does not send RTI5 or any AT commands.
+    Just listens for 'NetID:' and 'Channel:' lines from promiscuous S16=1 mode.
+    """
+    logger.info(f"**Starting passive scan** on '{device}' (baud={baud}).")
+    logger.info("NOTE: This will NOT send any commands. Only listens for visible traffic. For active scanning, use --deep-scan for parameter extraction.")
+
+    discovered_drones = {}
+
+    try:
+        ser = serial.Serial(device, baud, timeout=0.05)
+    except SerialException as exc:
+        logger.error(f"[SCAN] Could not open '{device}': {exc}")
+        return
+
+    start_time = time.time()
+
+    try:
+        logger.info("Listening for drones (in passive mode)...")
+
+        while True:
+            # Timeout check
+            if scan_timeout > 0 and (time.time() - start_time >= scan_timeout):
+                logger.info(f"Reached scan_timeout {scan_timeout}s => stopping.")
+                break
+
+            # Read any incoming data
+            lines = _read_all_lines(ser)
+            if not lines:
+                time.sleep(0.1)
+                continue
+
+            for line in lines:
+                netmatch = netid_pattern.search(line)
+                chmatch = chan_pattern.search(line)
+
+                if netmatch:
+                    net_val = int(netmatch.group(1))
+                    if net_val not in discovered_drones:
+                        logger.info(f"[SCAN] Found NetID: {net_val}")
+                        discovered_drones[net_val] = {
+                            "netid": net_val,
+                            "packets_count": 0,
+                            "last_channel": None,
+                            "first_seen": datetime.now(),
+                            "last_seen": None,
+                            "params": {}
+                        }
+
+                if chmatch:
+                    ch_val = int(chmatch.group(1))
+                    if discovered_drones:
+                        last_net = list(discovered_drones.keys())[-1]
+                        discovered_drones[last_net]["packets_count"] += 1
+                        discovered_drones[last_net]["last_channel"] = ch_val
+                        discovered_drones[last_net]["last_seen"] = datetime.now()
+
+                        if stop_on_detect:
+                            logger.info(f"[SCAN] Stopping on detection of NetID {last_net}")
+                            return
+
+                        _display_detected_drones(discovered_drones)
+
+                logger.debug(f"[PASSIVE LINE] {line.strip()}")
+
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt => stopping passive scan.")
+    finally:
+        ser.close()
+        logger.info("[SCAN] port closed after passive scan.")
+
+
+def deep_scan_for_drones(
+    device: str,
+    baud: int,
+    stop_on_detect: bool = False,
+    autotune_on_detect: bool = False,
+    scan_timeout: int = 0
+):
+    """
     Merged scanning + param spamming:
       - We assume the radio is already in AT mode with S16=1 set, so we see:
          "NetID: X", "Channel: Y", plus param lines from RTI5.

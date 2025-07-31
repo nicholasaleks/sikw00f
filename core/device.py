@@ -285,7 +285,7 @@ def flash_device(config, device: str, baud: int, board: str = None, check_mode: 
 
         # 8) Execute uploader.py with python3.11
         #    We pass the --port <device> so it knows which device to upload to
-        cmd = ["python3.11", "uploader.py", "--port", device, firmware_file]
+        cmd = ["python3.13", "uploader.py", "--port", device, firmware_file]
         logger.info(f"Flashing firmware with command: {' '.join(cmd)}")
 
         try:

@@ -53,7 +53,7 @@ SiKW00F is designed to easily capture and display a wide range of MAVLink teleme
 Linux (Ubuntu/Debian)
 ```
 sudo apt-get update
-sudo apt-get install git make sdcc build-essential python3.11
+sudo apt-get install git make sdcc build-essential python3.13
 ```
 
 MacOS (Ubuntu/Debian)
