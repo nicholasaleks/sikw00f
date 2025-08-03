@@ -11,6 +11,7 @@ import sys
 import argparse
 import configparser
 import os
+import time
 
 # Shared logger utilities (set_verbose_mode toggles between INFO/DEBUG levels)
 from core.logger_utils import logger, set_verbose_mode
@@ -134,8 +135,9 @@ def parse_arguments():
 
     # -- EAVESDROPPING COMMANDS --
     eavesdrop_group = parser.add_argument_group("Eavesdropping Commands")
-    eavesdrop_group.add_argument("--eavesdrop", action="store_true",
-                                 help="Eavesdrop on a drone's MAVLink telemetry (requires net_id).")
+    eavesdrop_group.add_argument("--eavesdrop", metavar="NETID", type=int,
+                             help="Eavesdrop on a drone's MAVLink telemetry. Automatically disables promiscuous mode and sets NETID before connecting.")
+
 
     args = parser.parse_args()
     return args
@@ -326,8 +328,22 @@ def main():
         sys.exit(0)
 
     # -- EAVESDROPPING COMMAND --
-    if args.eavesdrop:
-        logger.info("Eavesdropping on MAVLink telemetry.")
+    if args.eavesdrop is not None:
+        netid = args.eavesdrop
+        logger.info(f"[EAVESDROP] Preparing to eavesdrop with NETID={netid}...")
+
+        # Step 1: Disable promiscuous mode
+        logger.info("[EAVESDROP] Disabling promiscuous mode (ATS16=0)...")
+        disable_promiscuous_mode(device, baud)
+        time.sleep(2)
+
+        # Step 2: Set NETID
+        logger.info(f"[EAVESDROP] Setting NETID to {netid} (ATS3={netid})...")
+        set_netid(device, baud, str(netid))
+        time.sleep(2)
+
+        # Step 3: Start eavesdropping
+        logger.info("[EAVESDROP] Starting MAVLink eavesdropping session...")
         eavesdrop_mavlink(device, baud)
         sys.exit(0)
 

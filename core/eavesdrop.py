@@ -71,6 +71,42 @@ def _read_all(ser, chunk_size=1024):
     return "".join(output)
 
 
+def get_sik_params(device: str, baud: int) -> dict:
+    """
+    Reads current SiK settings using ATI5 and parses into a dictionary.
+    Example output:
+        {"NETID": "25", "PROMISCUOUS_MODE": "0", ...}
+    """
+    try:
+        with Serial(device, baud, timeout=1) as ser:
+            time.sleep(1)
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+            ser.write(b'\r\n')
+            time.sleep(0.5)
+            ser.write(b'ATO\r\n')
+            time.sleep(1)
+            ser.write(b'+++')
+            time.sleep(2)
+            ser.write(b'ATI5\r\n')
+            time.sleep(1)
+
+            raw = _read_all(ser)
+            logger.debug(f"[EAVESDROP] ATI5 response:\n{raw.strip()}")
+
+            params = {}
+            for line in raw.splitlines():
+                if ":" in line:
+                    keyval = line.split(":", 1)[1]
+                    if '=' in keyval:
+                        k, v = keyval.strip().split("=", 1)
+                        params[k.strip()] = v.strip()
+            return params
+    except Exception as e:
+        logger.error(f"[EAVESDROP] Failed to read ATI5: {e}")
+        return {}
+
+
 def eavesdrop_mavlink(device: str, baud: int):
     """
     1) disable ATS16=1 by calling disable_promiscuous_mode

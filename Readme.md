@@ -50,17 +50,31 @@ SiKW00F is designed to easily capture and display a wide range of MAVLink teleme
 
 ### Dependencies
 
+#### Get SDCC 4.4
+
+Download sdcc version 4.4 from source:
+
+https://sourceforge.net/projects/sdcc/files/sdcc-linux-amd64/4.4.0/sdcc-4.4.0-amd64-unknown-linux2.5.tar.bz2/download
+
+Install sdcc 4.4 from source:
+```
+tar xvf sdcc-4.4.0-amd64-unknown-linux2.5.tar.bz2
+cd sdcc-4.4.0
+sudo cp -r * /usr/local
+```
+
 Linux (Ubuntu/Debian)
 ```
 sudo apt-get update
-sudo apt-get install git make sdcc build-essential python3.13
+sudo apt-get install git make build-essential python3.13
 ```
 
 MacOS (Ubuntu/Debian)
 ```
-brew install git make sdcc python@3.11
+brew install git make python@3.13
 xcode-select --install
 ```
+
 
 ## Installation
 Clone the repository:
