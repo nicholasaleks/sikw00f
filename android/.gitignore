@@ -1,0 +1,23 @@
+# Gradle / build output
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Machine-specific SDK path
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.navigation/
+
+# Signing keys never belong in git
+*.jks
+*.keystore
+keystore.properties
+
+# OS clutter
+.DS_Store

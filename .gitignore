@@ -1,3 +1,13 @@
 data/
 SiK/
 sikw00f.log
+
+# OS / editor clutter
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Local editor/agent settings
+.claude/

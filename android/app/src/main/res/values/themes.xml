@@ -1,0 +1,8 @@
+<resources>
+    <!-- Dark window, status bar and nav bar so launch and system bars match the Compose theme. -->
+    <style name="Theme.SiKW00F" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/sikw00f_background</item>
+        <item name="android:statusBarColor">@color/sikw00f_background</item>
+        <item name="android:navigationBarColor">@color/sikw00f_surface</item>
+    </style>
+</resources>
